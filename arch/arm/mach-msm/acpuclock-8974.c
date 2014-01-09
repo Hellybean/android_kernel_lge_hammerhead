@@ -302,7 +302,7 @@ static struct l2_level l2_freq_tbl_v2[] __initdata = {
 	{ }
 };
 
-static struct l2_level l2_freq_tbl_v2_elementalx[] __initdata = {
+static struct l2_level l2_freq_tbl_v2_diablo[] __initdata = {
 	[0]  = { {  300000, PLL_0, 0,   0 }, LVL_LOW,   950000, 0 },
 	[1]  = { {  345600, HFPLL, 2,  36 }, LVL_LOW,   950000, 1 },
 	[2]  = { {  422400, HFPLL, 2,  44 }, LVL_LOW,   950000, 2 },
@@ -1128,8 +1128,8 @@ static int __init acpuclk_8974_probe(struct platform_device *pdev)
 	}
 
 	if (opt_bin == 1) {
-		acpuclk_8974_params.l2_freq_tbl = l2_freq_tbl_v2_elementalx;
-		acpuclk_8974_params.l2_freq_tbl_size = sizeof(l2_freq_tbl_v2_elementalx);
+		acpuclk_8974_params.l2_freq_tbl = l2_freq_tbl_v2_diablo;
+		acpuclk_8974_params.l2_freq_tbl_size = sizeof(l2_freq_tbl_v2_diablo);
 	}
 
 	return acpuclk_krait_init(&pdev->dev, &acpuclk_8974_params);
