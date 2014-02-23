@@ -28,6 +28,9 @@
 #include "audio_acdb.h"
 #include "q6voice.h"
 
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+#include <linux/input/prevent_sleep.h>
+#endif
 
 #define TIMEOUT_MS 500
 
@@ -39,6 +42,10 @@
 #define CVP_CAL_SIZE 245760
 /* CVS CAL Size: 49152 = 48 * 1024 */
 #define CVS_CAL_SIZE 49152
+
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+bool in_phone_call = false;
+#endif
 
 enum {
 	VOC_TOKEN_NONE,
@@ -3187,6 +3194,10 @@ static int voice_destroy_vocproc(struct voice_data *v)
 	mvm_handle = voice_get_mvm_handle(v);
 	cvp_handle = voice_get_cvp_handle(v);
 
+	/* disable slowtalk if st_enable is set */
+	if (v->st_enable)
+		voice_send_set_pp_enable_cmd(v, MODULE_ID_VOICE_MODULE_ST, 0);
+
 	/* stop playback or recording */
 	v->music_info.force = 1;
 	voice_cvs_stop_playback(v);
@@ -4496,6 +4507,9 @@ int voc_end_voice_call(uint32_t session_id)
 
 		v->voc_state = VOC_RELEASE;
 	}
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+	in_phone_call = false;
+#endif
 	mutex_unlock(&v->lock);
 	return ret;
 }
@@ -4702,6 +4716,10 @@ int voc_start_voice_call(uint32_t session_id)
 		ret = -EINVAL;
 		goto fail;
 	}
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+	in_phone_call = true;
+#endif
+
 fail:
 	mutex_unlock(&v->lock);
 	return ret;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -156,7 +156,7 @@ enum ocr_request {
 
 #define VDD_RES_RO_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 444; \
+	ko_attr.attr.mode = 0444; \
 	ko_attr.show = vdd_rstr_reg_##_name##_show; \
 	ko_attr.store = NULL; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -164,7 +164,7 @@ enum ocr_request {
 
 #define VDD_RES_RW_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 644; \
+	ko_attr.attr.mode = 0644; \
 	ko_attr.show = vdd_rstr_reg_##_name##_show; \
 	ko_attr.store = vdd_rstr_reg_##_name##_store; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -181,7 +181,7 @@ enum ocr_request {
 
 #define OCR_RW_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 644; \
+	ko_attr.attr.mode = 0644; \
 	ko_attr.show = ocr_reg_##_name##_show; \
 	ko_attr.store = ocr_reg_##_name##_store; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -189,7 +189,7 @@ enum ocr_request {
 
 #define PSM_RW_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 644; \
+	ko_attr.attr.mode = 0644; \
 	ko_attr.show = psm_reg_##_name##_show; \
 	ko_attr.store = psm_reg_##_name##_store; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -425,7 +425,7 @@ done_vdd_rstr_en:
 
 static struct vdd_rstr_enable vdd_rstr_en = {
 	.ko_attr.attr.name = __stringify(enabled),
-	.ko_attr.attr.mode = 644,
+	.ko_attr.attr.mode = 0644,
 	.ko_attr.show = vdd_rstr_en_show,
 	.ko_attr.store = vdd_rstr_en_store,
 	.enabled = 1,
@@ -687,6 +687,7 @@ fail:
 	return ret;
 }
 
+#if 0
 /* 1:enable, 0:disable */
 static int vdd_restriction_apply_all(int en)
 {
@@ -728,6 +729,7 @@ static int vdd_restriction_apply_all(int en)
 		return -EFAULT;
 	return ret;
 }
+#endif
 
 static int msm_thermal_get_freq_table(void)
 {
@@ -997,6 +999,7 @@ do_ocr_exit:
 	return ret;
 }
 
+#if 0
 static int do_vdd_restriction(void)
 {
 	struct tsens_device tsens_dev;
@@ -1045,6 +1048,7 @@ exit:
 	mutex_unlock(&vdd_rstr_mutex);
 	return ret;
 }
+#endif
 
 static int do_psm(void)
 {
@@ -1158,7 +1162,9 @@ static void __ref check_temp(struct work_struct *work)
 	}
 
 	do_core_control(temp);
+#if 0
 	do_vdd_restriction();
+#endif
 	do_psm();
 	do_ocr();
 	do_freq_control(temp);
@@ -1551,6 +1557,25 @@ static struct kernel_param_ops module_ops = {
 
 module_param_cb(enabled, &module_ops, &enabled, 0644);
 MODULE_PARM_DESC(enabled, "enforce thermal limit on cpu");
+module_param_named(limit_temp, msm_thermal_info.limit_temp_degC,
+		   uint, 0644);
+module_param_named(temp_hysteresis, msm_thermal_info.temp_hysteresis_degC,
+		   uint, 0644);
+module_param_named(freq_step, msm_thermal_info.bootup_freq_step, uint, 0644);
+module_param_named(core_limit_temp, msm_thermal_info.core_limit_temp_degC,
+		   uint, 0644);
+module_param_named(core_temp_hysteresis,
+		   msm_thermal_info.core_temp_hysteresis_degC, uint, 0644);
+module_param_named(freq_control_mask,
+		   msm_thermal_info.bootup_freq_control_mask, uint, 0644);
+module_param_named(hotplug_temp, msm_thermal_info.hotplug_temp_degC,
+		   uint, 0644);
+module_param_named(hotplug_temp_hysteresis,
+		   msm_thermal_info.hotplug_temp_hysteresis_degC, uint, 0644);
+module_param_named(psm_temp,
+		   msm_thermal_info.psm_temp_degC, uint, 0644);
+module_param_named(psm_temp_hysteresis,
+		   msm_thermal_info.psm_temp_hyst_degC, uint, 0644);
 
 static ssize_t show_cc_enabled(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -1789,11 +1814,11 @@ int __devinit msm_thermal_init(struct msm_thermal_data *pdata)
 		pr_err("%s: cannot register cpufreq notifier\n",
 			KBUILD_MODNAME);
 	INIT_DELAYED_WORK(&check_temp_work, check_temp);
-	schedule_delayed_work(&check_temp_work, 0);
+	schedule_delayed_work(&check_temp_work, msecs_to_jiffies(10000));
 
 	if (num_possible_cpus() > 1) {
 		mutex_lock(&core_control_mutex);
-		core_control_enabled = 1;
+		core_control_enabled = 0; // Disable core control
 		register_cpu_notifier(&msm_thermal_cpu_notifier);
 		update_offline_cores(cpus_offlined);
 		mutex_unlock(&core_control_mutex);
@@ -2431,8 +2456,8 @@ static int probe_cc(struct device_node *node, struct msm_thermal_data *data,
 
 	key = "qcom,cpu-sensors";
 	cpu_cnt = of_property_count_strings(node, key);
-	if (cpu_cnt != num_possible_cpus()) {
-		pr_err("%s: Wrong number of cpu\n", KBUILD_MODNAME);
+	if (cpu_cnt < num_possible_cpus()) {
+		pr_err("%s: Wrong number of cpu sensors\n", KBUILD_MODNAME);
 		ret = -EINVAL;
 		goto hotplug_node_fail;
 	}

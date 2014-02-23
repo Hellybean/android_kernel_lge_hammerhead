@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -236,6 +236,10 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 	}
 
 	kgsl_pwrctrl_pwrlevel_change(device, level);
+
+	/*Invalidate the constraint set */
+	pwr->constraint.type = KGSL_CONSTRAINT_NONE;
+
 	*freq = kgsl_pwrctrl_active_freq(pwr);
 
 	mutex_unlock(&device->mutex);
@@ -407,11 +411,11 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 	/* Let's start with 10 ms and tune in later */
 	profile->polling_ms = 10;
 
-	/* do not include the 'off' level or duplicate freq. levels */
-	for (i = 0; i < (pwr->num_pwrlevels - 1); i++)
+	/* do not include duplicate freq. levels */
+	for (i = 0; i < pwr->num_pwrlevels; i++)
 		pwrscale->freq_table[out++] = pwr->pwrlevels[i].gpu_freq;
 
-	profile->max_state = out;
+	profile->max_state = out - 1;
 	/* link storage array to the devfreq profile pointer */
 	profile->freq_table = pwrscale->freq_table;
 

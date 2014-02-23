@@ -13,6 +13,7 @@
  * GNU General Public License for more details.
  *
  * Author: Erasmux
+ * Modded by: Pranav Vashi (neobuddy89)
  *
  * Based on the interactive governor By Mike Chan (mike@android.com)
  * which was adaptated to 2.6.29 kernel by Nadlabak (pavel@doshaska.net)
@@ -891,6 +892,6 @@ static void __exit cpufreq_smartass_exit(void)
 
 module_exit(cpufreq_smartass_exit);
 
-MODULE_AUTHOR ("Erasmux");
+MODULE_AUTHOR ("Erasmux, modded by Pranav Vashi");
 MODULE_DESCRIPTION ("'cpufreq_smartassH3' - A smart cpufreq governor");
 MODULE_LICENSE ("GPL");

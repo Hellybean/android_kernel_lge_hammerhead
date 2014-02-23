@@ -28,15 +28,6 @@ config DEVKMEM
 	  kind of kernel debugging operations.
 	  When in doubt, say "N".
 
-config FRANDOM
-	bool "/dev/frandom device support"
-	default y
-	help
-	  Say Y here if you want to support the /dev/frandom device. Frandom
-	  is a Linux kernel random number generator, which is 10-50 times faster 
-	  than what you get from Linux' built-in /dev/urandom.
-	  When in doubt, say "N"
-
 config STALDRV
 	bool "Stallion multiport serial support"
 	depends on SERIAL_NONSTANDARD
@@ -690,6 +681,16 @@ config CSDIO_DEVICE_ID
 	help
 	  Enter device id for targeted sdio device, this may be overwritten by
 	  module parameters.
+
+config FRANDOM
+	tristate "Frandom: Fast random number generator support"
+	default n
+	help
+	  Frandom is a Linux kernel random number generator, which is 10-50
+	  times faster than what you get from Linux' built-in /dev/urandom.
+	  And it uses very little (/dev/frandom) or none (/dev/erandom) of
+	  the kernel's entropy pool, so it is very useful for applications
+	  that require a handy source for lots of random data.
 .
 endmenu
 

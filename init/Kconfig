@@ -208,10 +208,6 @@ config KERNEL_LZ4
 	bool "LZ4"
 	depends on HAVE_KERNEL_LZ4
 	help
-	  LZ4 is an LZ77-type compressor with a fixed, byte-oriented encoding.
-	  A preliminary version of LZ4 de/compression tool is available at
-	  <https://code.google.com/p/lz4/>.
-
 	  Its compression ratio is worse than LZO. The size of the kernel
 	  is about 8% bigger than LZO. But the decompression speed is
 	  faster than LZO.
@@ -623,14 +619,6 @@ config CGROUP_FREEZER
 	  Provides a way to freeze and unfreeze all tasks in a
 	  cgroup.
 
-config CGROUP_TIMER_SLACK
-	bool "Timer slack cgroup controller"
-	help
-	  Provides a way to set minimal timer slack value for tasks in
-	  a cgroup.
-	  It's useful in mobile devices where certain background apps
-	  are attached to a cgroup and combined wakeups are desired.
-
 config CGROUP_DEVICE
 	bool "Device controller for cgroups"
 	help
@@ -985,7 +973,6 @@ config PANIC_TIMEOUT
 menuconfig EXPERT
 	bool "Configure standard kernel features (expert users)"
 	# Unhide debug options, to make the on-by-default options visible
-	select DEBUG_KERNEL
 	help
 	  This option allows certain base kernel options and settings
           to be disabled or tweaked. This is for specialized

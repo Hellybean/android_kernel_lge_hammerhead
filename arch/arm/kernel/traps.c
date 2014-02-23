@@ -37,7 +37,13 @@
 
 #include <trace/events/exception.h>
 
-static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
+static const char *handler[]= {
+	"prefetch abort",
+	"data abort",
+	"address exception",
+	"interrupt",
+	"undefined instruction",
+};
 
 void *vectors_page;
 
@@ -370,17 +376,9 @@ static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
 
 asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 {
-	unsigned int correction = thumb_mode(regs) ? 2 : 4;
 	unsigned int instr;
 	siginfo_t info;
 	void __user *pc;
-
-	/*
-	 * According to the ARM ARM, PC is 2 or 4 bytes ahead,
-	 * depending whether we're in Thumb mode or not.
-	 * Correct this offset.
-	 */
-	regs->ARM_pc -= correction;
 
 	pc = (void __user *)instruction_pointer(regs);
 
@@ -396,20 +394,23 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 #endif
 			instr = *(u32 *) pc;
 	} else if (thumb_mode(regs)) {
-		get_user(instr, (u16 __user *)pc);
+		if (get_user(instr, (u16 __user *)pc))
+			goto die_sig;
 		if (is_wide_instruction(instr)) {
 			unsigned int instr2;
-			get_user(instr2, (u16 __user *)pc+1);
+			if (get_user(instr2, (u16 __user *)pc+1))
+				goto die_sig;
 			instr <<= 16;
 			instr |= instr2;
 		}
-	} else {
-		get_user(instr, (u32 __user *)pc);
+	} else if (get_user(instr, (u32 __user *)pc)) {
+		goto die_sig;
 	}
 
 	if (call_undef_hook(regs, instr) == 0)
 		return;
 
+die_sig:
 	trace_undef_instr(regs, (void *)pc);
 
 #ifdef CONFIG_DEBUG_USER
@@ -481,28 +482,65 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	return regs->ARM_r0;
 }
 
-static inline void
+static long do_cache_op_restart(struct restart_block *);
+
+static inline int
+__do_cache_op(unsigned long start, unsigned long end)
+{
+	int ret;
+
+	do {
+		unsigned long chunk = min(PAGE_SIZE, end - start);
+
+		if (signal_pending(current)) {
+			struct thread_info *ti = current_thread_info();
+
+			ti->restart_block = (struct restart_block) {
+				.fn	= do_cache_op_restart,
+			};
+
+			ti->arm_restart_block = (struct arm_restart_block) {
+				{
+					.cache = {
+						.start	= start,
+						.end	= end,
+					},
+				},
+			};
+
+			return -ERESTART_RESTARTBLOCK;
+		}
+
+		ret = flush_cache_user_range(start, start + chunk);
+		if (ret)
+			return ret;
+
+		cond_resched();
+		start += chunk;
+	} while (start < end);
+
+	return 0;
+}
+
+static long do_cache_op_restart(struct restart_block *unused)
+{
+	struct arm_restart_block *restart_block;
+
+	restart_block = &current_thread_info()->arm_restart_block;
+	return __do_cache_op(restart_block->cache.start,
+			     restart_block->cache.end);
+}
+
+static inline int
 do_cache_op(unsigned long start, unsigned long end, int flags)
 {
-	struct mm_struct *mm = current->active_mm;
-	struct vm_area_struct *vma;
-
 	if (end < start || flags)
-		return;
+		return -EINVAL;
 
-	down_read(&mm->mmap_sem);
-	vma = find_vma(mm, start);
-	if (vma && vma->vm_start < end) {
-		if (start < vma->vm_start)
-			start = vma->vm_start;
-		if (end > vma->vm_end)
-			end = vma->vm_end;
+	if (!access_ok(VERIFY_READ, start, end - start))
+		return -EFAULT;
 
-		up_read(&mm->mmap_sem);
-		flush_cache_user_range(start, end);
-		return;
-	}
-	up_read(&mm->mmap_sem);
+	return __do_cache_op(start, end);
 }
 
 /*
@@ -548,8 +586,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 	 * the specified region).
 	 */
 	case NR(cacheflush):
-		do_cache_op(regs->ARM_r0, regs->ARM_r1, regs->ARM_r2);
-		return 0;
+		return do_cache_op(regs->ARM_r0, regs->ARM_r1, regs->ARM_r2);
 
 	case NR(usr26):
 		if (!(elf_hwcap & HWCAP_26BIT))

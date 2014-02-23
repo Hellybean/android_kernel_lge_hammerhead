@@ -26,11 +26,19 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include "logger.h"
+#include <linux/powersuspend.h>
 
 #include <asm/ioctls.h>
 
-static unsigned int enabled = 1;
-module_param(enabled, uint, S_IWUSR | S_IRUGO);
+#ifndef CONFIG_LOGCAT_SIZE
+#define CONFIG_LOGCAT_SIZE 256
+#endif
+
+static unsigned int log_enabled = 1;
+static unsigned int log_always_on = 0;
+
+module_param(log_enabled, uint, S_IWUSR | S_IRUGO);
+module_param(log_always_on, uint, S_IWUSR | S_IRUGO);
 
 /*
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
@@ -436,10 +444,41 @@ static ssize_t do_write_log_from_user(struct logger_log *log,
 			 */
 			return -EFAULT;
 
+	/* print as kernel log if the log string starts with "!@" */
+	if (count >= 2) {
+		if (log->buffer[log->w_off] == '!'
+		    && log->buffer[logger_offset(log, log->w_off + 1)] == '@') {
+			char tmp[256];
+			int i;
+			for (i = 0; i < min(count, sizeof(tmp) - 1); i++)
+				tmp[i] =
+				    log->buffer[logger_offset(log, log->w_off + i)];
+			tmp[i] = '\0';
+			printk("%s\n", tmp);
+		}
+	}
+
 	log->w_off = logger_offset(log, log->w_off + count);
 
 	return count;
 }
+
+static void log_early_suspend(struct power_suspend *handler)
+{
+	if (log_enabled)
+		log_enabled = 0;
+}
+
+static void log_late_resume(struct power_suspend *handler)
+{
+	if (!log_enabled)
+		log_enabled = 1;
+}
+
+static struct power_suspend log_suspend = {
+	.suspend = log_early_suspend,
+	.resume = log_late_resume,
+};
 
 /*
  * logger_aio_write - our write method, implementing support for write(),
@@ -455,7 +494,7 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	struct timespec now;
 	ssize_t ret = 0;
 
-	if (!enabled)
+	if (!log_enabled && !log_always_on)
 		return 0;
 
 	now = current_kernel_time();
@@ -734,10 +773,10 @@ static struct logger_log VAR = { \
 	.size = SIZE, \
 };
 
-DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 256*1024)
-DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
-DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 256*1024)
-DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 256*1024)
+DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*1024)
+DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, CONFIG_LOGCAT_SIZE*1024)
+DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, CONFIG_LOGCAT_SIZE*1024)
+DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, CONFIG_LOGCAT_SIZE*1024)
 
 static struct logger_log *get_log_from_minor(int minor)
 {
@@ -772,6 +811,8 @@ static int __init init_log(struct logger_log *log)
 static int __init logger_init(void)
 {
 	int ret;
+
+	register_power_suspend(&log_suspend);
 
 	ret = init_log(&log_main);
 	if (unlikely(ret))

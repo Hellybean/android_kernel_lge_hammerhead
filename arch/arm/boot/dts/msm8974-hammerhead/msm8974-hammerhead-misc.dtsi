@@ -15,7 +15,7 @@
 		compatible = "msm,pwm_vibrator";
 		haptic-pwr-gpio = <&msmgpio 60 0x00>;
 		motor-pwm-gpio = <&msmgpio 27 0x00>;
-		motor-amp = <63>;
+		motor-amp = <75>;
 		n-value = <127>;
 		vibe-warmup-delay = <20>;
 		vibe-braking-gain = <100>;
@@ -56,7 +56,7 @@
 			lm3630,bank_sel = <0>;  /* BANK A */
 			lm3630,linear_map = <1>;
 			lm3630,max_current = <0x12>;
-			lm3630,min_brightness = <0x01>;
+			lm3630,min_brightness = <0x03>;
 			lm3630,default_brightness = <0x20>;
 			lm3630,max_brightness = <0xFF>;
 			lm3630,pwm_enable = <0>;
