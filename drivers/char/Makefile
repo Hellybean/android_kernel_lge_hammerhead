@@ -69,4 +69,4 @@ obj-$(CONFIG_MMC_GENERIC_CSDIO)	+= csdio.o
 obj-$(CONFIG_DIAG_CHAR)		+= diag/
 obj-$(CONFIG_MSM_ADSPRPC)       += adsprpc.o
 
-obj-$(CONFIG_FRANDOM)     += frandom.o
+obj-$(CONFIG_FRANDOM)     	+= frandom.o
